@@ -8,6 +8,8 @@ const NavigationBar = () => {
     { name: '請求', path: '/billing', icon: '💳' },
     { name: '代表者一覧', path: '/instructors', icon: '🕺' },
     { name: '楽曲一覧', path: '/songs', icon: '🎵' },
+    { name: '管理者管理', path: '/admin-users', icon: '🔐' },
+    { name: 'マイページ', path: '/mypage', icon: '⚙️' },
   ];
 
   return (
@@ -45,7 +47,8 @@ const styles = {
     backgroundColor: '#1e293b',
     color: '#ffffff',
     padding: '20px 0',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    overflowY: 'auto' // ★ここを追加：メニューが多い場合にスクロールできるようにする
   },
   sidebarHeader: {
     padding: '0 20px 20px',

@@ -6,6 +6,16 @@ const InstructorsPage = () => {
   const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ★追加: 検索フィルター用の状態
+  const [filters, setFilters] = useState({
+    role: 'すべて',
+    name: '',
+    activityName: '',
+    kana: '',
+    email: '',
+    memberNo: ''
+  });
+
   // 編集モーダル用の状態
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState(null);
@@ -32,16 +42,41 @@ const InstructorsPage = () => {
 
   // 編集モーダルを開く
   const handleOpenEditModal = (inst) => {
-    setEditingInstructor({ ...inst });
+    setEditingInstructor({
+      ...inst,
+      role: inst.role || 'ZIN',
+      activityName: inst.activityName || ''
+    });
     setIsModalOpen(true);
   };
 
-  // 入力値変更
+  // 入力値変更（編集モーダル用）
   const handleChange = (e) => {
     const { name, value } = e.target;
     setEditingInstructor({
       ...editingInstructor,
       [name]: value
+    });
+  };
+
+  // ★追加: 検索フィルターの入力変更
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters({
+      ...filters,
+      [name]: value
+    });
+  };
+
+  // 検索フィルターをクリア
+  const handleClearFilters = () => {
+    setFilters({
+      role: 'すべて',
+      name: '',
+      activityName: '',
+      kana: '',
+      email: '',
+      memberNo: ''
     });
   };
 
@@ -51,13 +86,14 @@ const InstructorsPage = () => {
     if (!editingInstructor.name) return alert('代表者名を入力してください');
 
     try {
-      // ドキュメントID（またはlid）を元にFirestoreを更新
       const docRef = doc(db, 'instructors', editingInstructor.id);
       await updateDoc(docRef, {
+        activityName: editingInstructor.activityName || '',
         name: editingInstructor.name,
         kana: editingInstructor.kana || '',
         email: editingInstructor.email || '',
-        memberNo: editingInstructor.memberNo || ''
+        memberNo: editingInstructor.memberNo || '',
+        role: editingInstructor.role || 'ZIN'
       });
 
       setIsModalOpen(false);
@@ -69,15 +105,155 @@ const InstructorsPage = () => {
     }
   };
 
+  // 区分に応じたバッジスタイルを返すヘルパー関数
+  const getRoleBadgeStyle = (role) => {
+    const currentRole = role || 'ZIN';
+    if (currentRole === 'ZES') {
+      return { ...styles.badge, backgroundColor: '#dbeafe', color: '#1d4ed8' };
+    }
+    if (currentRole === 'JAMMER') {
+      return { ...styles.badge, backgroundColor: '#fef3c7', color: '#b45309' };
+    }
+    return { ...styles.badge, backgroundColor: '#f1f5f9', color: '#475569' };
+  };
+
+  // ★追加: AND条件でのフィルタリング処理
+  const filteredInstructors = instructors.filter((inst) => {
+    // 1. 区分フィルター
+    if (filters.role !== 'すべて') {
+      const instRole = inst.role || 'ZIN';
+      if (instRole !== filters.role) return false;
+    }
+
+    // 2. 活動名 (部分一致)
+    if (filters.activityName.trim() !== '') {
+      const target = (inst.activityName || '').toLowerCase();
+      if (!target.includes(filters.activityName.toLowerCase().trim())) return false;
+    }
+
+    // 3. 代表者名 (部分一致・大文字小文字無視)
+    if (filters.name.trim() !== '') {
+      const target = (inst.name || '').toLowerCase();
+      if (!target.includes(filters.name.toLowerCase().trim())) return false;
+    }
+
+    // 4. ふりがな (部分一致)
+    if (filters.kana.trim() !== '') {
+      const target = (inst.kana || '').toLowerCase();
+      if (!target.includes(filters.kana.toLowerCase().trim())) return false;
+    }
+
+    // 5. Email (部分一致)
+    if (filters.email.trim() !== '') {
+      const target = (inst.email || '').toLowerCase();
+      if (!target.includes(filters.email.toLowerCase().trim())) return false;
+    }
+
+    // 6. 会員No (部分一致)
+    if (filters.memberNo.trim() !== '') {
+      const target = (inst.memberNo || '').toLowerCase();
+      if (!target.includes(filters.memberNo.toLowerCase().trim())) return false;
+    }
+
+    return true; // すべての条件を通過したら表示
+  });
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>代表者（講師）一覧</h1>
+        <h1 style={styles.title}>代表者一覧</h1>
+      </div>
+
+      {/* --- 検索フィルターエリア --- */}
+      <div style={styles.filterCard}>
+        <div style={styles.filterHeader}>
+          <span style={{ fontWeight: 'bold', color: '#1e293b' }}>🔍 検索フィルター（AND条件）</span>
+          <button onClick={handleClearFilters} style={styles.clearBtn}>条件クリア</button>
+        </div>
+        <div style={styles.filterGrid}>
+          <label style={styles.filterLabel}>
+            区分:
+            <select
+              name="role"
+              value={filters.role}
+              onChange={handleFilterChange}
+              style={styles.input}
+            >
+              <option value="すべて">すべて</option>
+              <option value="ZIN">ZIN</option>
+              <option value="ZES">ZES</option>
+              <option value="JAMMER">JAMMER</option>
+            </select>
+          </label>
+
+          <label style={styles.filterLabel}>
+            活動名:
+            <input
+              type="text"
+              name="activityName"
+              value={filters.activityName}
+              onChange={handleFilterChange}
+              placeholder="例: サークル名"
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.filterLabel}>
+            代表者名:
+            <input
+              type="text"
+              name="name"
+              value={filters.name}
+              onChange={handleFilterChange}
+              placeholder="例: 山田"
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.filterLabel}>
+            ふりがな:
+            <input
+              type="text"
+              name="kana"
+              value={filters.kana}
+              onChange={handleFilterChange}
+              placeholder="例: やまだ"
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.filterLabel}>
+            Email:
+            <input
+              type="text"
+              name="email"
+              value={filters.email}
+              onChange={handleFilterChange}
+              placeholder="例: @example.com"
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.filterLabel}>
+            会員No:
+            <input
+              type="text"
+              name="memberNo"
+              value={filters.memberNo}
+              onChange={handleFilterChange}
+              placeholder="例: 1234"
+              style={styles.input}
+            />
+          </label>
+        </div>
       </div>
 
       <div style={styles.card}>
         <div style={styles.countInfo}>
-          <strong>登録総数:</strong> {instructors.length} 名
+          <strong>一致件数:</strong> {filteredInstructors.length} 名 
+          <span style={{ fontSize: '0.9rem', color: '#64748b', marginLeft: '8px' }}>
+            （登録総数: {instructors.length} 名）
+          </span>
           <span style={{ fontSize: '0.85rem', color: '#64748b', marginLeft: '10px' }}>
             （行をクリックすると編集できます）
           </span>
@@ -88,6 +264,8 @@ const InstructorsPage = () => {
             <thead>
               <tr>
                 <th style={styles.th}>LID</th>
+                <th style={styles.th}>区分</th>
+                <th style={styles.th}>活動名</th>
                 <th style={styles.th}>代表者名</th>
                 <th style={styles.th}>ふりがな</th>
                 <th style={styles.th}>Emailアドレス</th>
@@ -98,22 +276,28 @@ const InstructorsPage = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" style={styles.emptyTd}>読み込み中...</td>
+                  <td colSpan="8" style={styles.emptyTd}>読み込み中...</td>
                 </tr>
-              ) : instructors.length === 0 ? (
+              ) : filteredInstructors.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={styles.emptyTd}>
-                    登録されている代表者情報はありません。
+                  <td colSpan="8" style={styles.emptyTd}>
+                    条件に一致する代表者情報はありません。
                   </td>
                 </tr>
               ) : (
-                instructors.map((inst) => (
+                filteredInstructors.map((inst) => (
                   <tr 
                     key={inst.id} 
                     onClick={() => handleOpenEditModal(inst)} 
                     style={styles.clickableRow}
                   >
                     <td style={{ ...styles.td, fontWeight: 'bold', color: '#2563eb' }}>{inst.lid}</td>
+                    <td style={styles.td}>
+                      <span style={getRoleBadgeStyle(inst.role)}>
+                        {inst.role || 'ZIN'}
+                      </span>
+                    </td>
+                    <td style={{ ...styles.td, color: '#475569' }}>{inst.activityName || '-'}</td>
                     <td style={{ ...styles.td, fontWeight: 'bold' }}>{inst.name}</td>
                     <td style={styles.td}>{inst.kana || '-'}</td>
                     <td style={styles.td}>{inst.email || '-'}</td>
@@ -142,6 +326,32 @@ const InstructorsPage = () => {
                   value={editingInstructor.lid}
                   disabled
                   style={{ ...styles.input, backgroundColor: '#f1f5f9', color: '#64748b' }}
+                />
+              </label>
+
+              <label style={styles.label}>
+                区分:
+                <select
+                  name="role"
+                  value={editingInstructor.role || 'ZIN'}
+                  onChange={handleChange}
+                  style={styles.input}
+                >
+                  <option value="ZIN">ZIN</option>
+                  <option value="ZES">ZES</option>
+                  <option value="JAMMER">JAMMER</option>
+                </select>
+              </label>
+
+              <label style={styles.label}>
+                活動名:
+                <input
+                  type="text"
+                  name="activityName"
+                  value={editingInstructor.activityName || ''}
+                  onChange={handleChange}
+                  placeholder="例: サークル名やアーティスト名など"
+                  style={styles.input}
                 />
               </label>
 
@@ -226,6 +436,42 @@ const styles = {
     color: '#0f172a',
     margin: 0
   },
+  filterCard: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+  },
+  filterHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '15px'
+  },
+  clearBtn: {
+    padding: '4px 10px',
+    borderRadius: '4px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#f8fafc',
+    color: '#64748b',
+    fontSize: '0.8rem',
+    cursor: 'pointer'
+  },
+  filterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: '12px'
+  },
+  filterLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    fontSize: '0.82rem',
+    color: '#475569',
+    fontWeight: 'bold'
+  },
   card: {
     background: '#ffffff',
     borderRadius: '12px',
@@ -266,6 +512,13 @@ const styles = {
     padding: '14px',
     color: '#334155',
     whiteSpace: 'nowrap'
+  },
+  badge: {
+    display: 'inline-block',
+    padding: '4px 10px',
+    borderRadius: '9999px',
+    fontSize: '0.78rem',
+    fontWeight: 'bold'
   },
   emptyTd: {
     padding: '40px',
@@ -309,7 +562,8 @@ const styles = {
     borderRadius: '6px',
     border: '1px solid #cbd5e1',
     fontWeight: 'normal',
-    fontSize: '0.9rem'
+    fontSize: '0.9rem',
+    backgroundColor: '#ffffff'
   },
   modalActions: {
     display: 'flex',
